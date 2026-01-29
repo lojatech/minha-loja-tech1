@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TechStore Pro - Oficial</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+ <div class="top-bar">
+  <div class="logo" onclick="location.reload()">TECHSTORE</div>
+  <button class="cart-btn-main" onclick="toggleCart()">🛒 Carrinho (<span id="cart-count-badge">0</span>)</button>
+ </div>
+ <div class="search-container">
+    <span class="search-icon"></span>
+    <input id="searchInput" placeholder="O que você procura hoje?" oninput="filtrarTexto()">
+ </div>
+ <div class="filter-bar">
+  <button class="filter-btn active" onclick="filtrarMarca('todos',this)">Todos</button>
+  <button class="filter-btn" onclick="filtrarMarca('iPhones',this)">iPhone</button>
+  <button class="filter-btn" onclick="filtrarMarca('Samsung',this)">Samsung</button>
+  <button class="filter-btn" onclick="filtrarMarca('Xiaomi',this)">Xiaomi</button>
+  <button class="filter-btn" onclick="filtrarMarca('Motorola',this)">Motorola</button>
+  <button class="filter-btn" onclick="filtrarMarca('Acessórios',this)">Acessórios</button>
+ </div>
+</header>
+
+<div id="vitrine"></div>
+
+<div id="overlay" onclick="toggleCart()"></div>
+<div id="carrinho-lateral">
+    <div class="cart-header"><span>MEU CARRINHO</span><button onclick="toggleCart()" style="background:none; border:none; color:#fff; font-size:32px; cursor:pointer;">&times;</button></div>
+    <div class="cart-items" id="lista-carrinho"></div>
+    <div class="cart-footer">
+        <div style="display:flex; justify-content:space-between; margin-bottom:20px;"><span>TOTAL:</span><span id="cart-total" style="color:#2ed573; font-weight:900; font-size:22px;">R$ 0,00</span></div>
+        <button class="btn-checkout" onclick="irParaPagamento()">FINALIZAR COMPRA</button>
+    </div>
+</div>
+
+<script>
+const produtos={
+ "iPhones":[
+  {n:"iPhone 16 Pro Max",p:10499,f:"i16pm.jpg"}, {n:"iPhone 15 Pro",p:7200,f:"i15p.jpg"}, {n:"iPhone 14 Pro",p:5800,f:"i14p.jpg"}, {n:"iPhone 13 Pro Max",p:4900,f:"i13pm.jpg"}, {n:"iPhone 13",p:3200,f:"i13.jpg"}, {n:"iPhone 12",p:2800,f:"i12.jpg"}, {n:"iPhone 7s",p:920,f:"i7s.jpg"}, {n:"iPhone 11",p:2100,f:"i11.jpg"}, {n:"iPhone XR",p:1300,f:"ixr.jpg"}, {n:"iPhone SE 2022",p:1000,f:"ise.jpg"}
+ ],
+ "Samsung":[
+  {n:"Galaxy S24 Ultra",p:7199,f:"s24u.jpg"}, {n:"Galaxy S23 Ultra",p:5100,f:"s23u.jpg"}, {n:"Galaxy S22 Ultra",p:3200,f:"s22u.jpg"}, {n:"Galaxy Z Fold 5",p:8900,f:"fold5.jpg"}, {n:"Galaxy Z Flip 5",p:3800,f:"flip5.jpg"}, {n:"Galaxy S24 Plus",p:5200,f:"s24p.jpg"}, {n:"Galaxy A55",p:1500,f:"a55.jpg"}, {n:"Galaxy A35",p:1300,f:"a35.jpg"}, {n:"Galaxy A25",p:1200,f:"a25.jpg"}, {n:"Galaxy A15",p:1050,f:"a15.jpg"}
+ ],
+ "Xiaomi":[
+  {n:"Xiaomi 14 Ultra",p:8500,f:"x14u.jpg"}, {n:"Xiaomi 14",p:5200,f:"x14.jpg"}, {n:"Xiaomi 13T",p:3500,f:"13t.jpg"}, {n:"Poco F6",p:2700,f:"f6.jpg"}, {n:"Poco F5",p:2100,f:"f5.jpg"}, {n:"Redmi Note 13 Pro",p:1800,f:"rn13p.jpg"}, {n:"Redmi Note 13",p:1400,f:"rn13.jpg"}, {n:"Redmi 13C",p:950,f:"13c.jpg"}, {n:"Poco X6 Pro",p:2100,f:"x6p.jpg"}, {n:"Redmi A3",p:650,f:"ra3.jpg"}
+ ],
+ "Motorola":[
+  {n:"Edge 50 Ultra",p:5400,f:"e50u.jpg"}, {n:"Razr 50 Ultra",p:6200,f:"razr50.jpg"}, {n:"Edge 40",p:2100,f:"e40.jpg"}, {n:"Edge 40 Neo",p:1950,f:"e40n.jpg"}, {n:"Moto G85",p:1850,f:"g85.jpg"}, {n:"Moto G73",p:1300,f:"g73.jpg"}, {n:"Moto G54",p:1200,f:"g54.jpg"}, {n:"Moto G34",p:1000,f:"g34.jpg"}, {n:"Moto G24",p:950,f:"g24.jpg"}, {n:"Moto E13",p:650,f:"e13.jpg"}
+ ],
+ "Acessórios":[
+  {n:"AirPods Pro 2",p:1350,f:"airp.jpg"}, {n:"Galaxy Watch 7",p:1100,f:"watch7.jpg"}, {n:"Apple Watch S9",p:1750,f:"aws9.jpg"}, {n:"Power Bank 10k",p:90,f:"pb.jpg"}, {n:"Carregador 20W",p:100,f:"car1.jpg"}, {n:"Capa Silicone",p:35,f:"cap1.jpg"}, {n:"Película Privativa",p:25,f:"pel.jpg"}, {n:"Fone Bluetooth",p:95,f:"fonebt.jpg"}, {n:"Cabo USB-C",p:40,f:"cab1.jpg"}, {n:"Suporte Veicular",p:65,f:"sup.jpg"}
+ ]
+};
+
+let carrinho = JSON.parse(localStorage.getItem('carrinhoTechStore')) || [];
+
+function precoFinal(nome, p){ 
+    if(nome === "Galaxy S24 Ultra") return 5300;
+    if(nome === "Galaxy Z Fold 5") return 5900;
+    if(nome === "Xiaomi 14 Ultra") return 5450;
+    if(p >= 5000) return 3250 + (p % 751); 
+    return p;
+}
+
+function renderizar(){
+ let html='';
+ for(let cat in produtos){
+  html+=`<div class="category-section" id="cat-${cat}"><h2>${cat}</h2><div class="carousel-container">`;
+  produtos[cat].forEach(p=>{
+   let novo=precoFinal(p.n, p.p), desc=novo!==p.p, fURL=`fotos/${p.f}`;
+   html+=`
+   <div class="product-card" data-name="${p.n.toLowerCase()}">
+    <div class="img-box"><img src="${fURL}" onerror="this.src='https://via.placeholder.com/150'"></div>
+    ${desc?`<div class="badge">OFERTA</div>`:''}
+    <div class="card-content">
+     <h3>${p.n}</h3>
+     ${desc?`<div class="price-old">R$ ${p.p.toLocaleString('pt-BR')}</div><div class="price">R$ ${novo.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>`:`<div class="price">R$ ${p.p.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>`}
+     <div class="stock">Estoque: ${Math.floor(Math.random()*12)+1} un.</div>
+    </div>
+    <button class="buy-button" onclick="adicionarAoCarrinho('${p.n}','${novo}','${fURL}')">Comprar</button>
+   </div>`;
+  });
+  html+='</div></div>';
+ }
+ document.getElementById('vitrine').innerHTML=html;
+}
+
+function adicionarAoCarrinho(nome, preco, foto) {
+    carrinho.push({ n: nome, p: preco, f: foto });
+    atualizarCarrinho();
+    toggleCart();
+}
+
+function atualizarCarrinho() {
+    const lista = document.getElementById('lista-carrinho');
+    const totalEl = document.getElementById('cart-total');
+    const badge = document.getElementById('cart-count-badge');
+    localStorage.setItem('carrinhoTechStore', JSON.stringify(carrinho));
+    badge.innerText = carrinho.length;
+
+    lista.innerHTML = '';
+    let total = 0;
+    carrinho.forEach((item, index) => {
+        total += parseFloat(item.p);
+        lista.innerHTML += `
+            <div class="cart-item">
+                <img src="${item.f}" onerror="this.src='https://via.placeholder.com/60'">
+                <div style="flex:1">
+                    <h4 style="margin:0; font-size:14px; color:#fff">${item.n}</h4>
+                    <p style="margin:5px 0; color:#2ed573; font-weight:bold">R$ ${parseFloat(item.p).toLocaleString('pt-BR',{minimumFractionDigits:2})}</p>
+                    <button onclick="removerItem(${index})" style="color:red; background:none; border:none; padding:0; font-size:11px; cursor:pointer;">Remover</button>
+                </div>
+            </div>`;
+    });
+    totalEl.innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+}
+
+function toggleCart() {
+    document.getElementById('carrinho-lateral').classList.toggle('active');
+    document.getElementById('overlay').classList.toggle('active');
+}
+
+function removerItem(i) { carrinho.splice(i, 1); atualizarCarrinho(); }
+
+function irParaPagamento() { 
+    if(carrinho.length === 0) return alert("Adicione itens para continuar!");
+    window.location.href = 'pagamento.html'; 
+}
+
+function filtrarMarca(m,b){
+ document.getElementById('searchInput').value = ""; 
+ document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));
+ b.classList.add('active');
+ document.querySelectorAll('.category-section').forEach(s=>{
+  if(m==='todos') s.classList.remove('hidden');
+  else s.id==='cat-'+m ? s.classList.remove('hidden') : s.classList.add('hidden');
+ });
+}
+
+function filtrarTexto(){
+ let t=document.getElementById('searchInput').value.toLowerCase();
+ document.querySelectorAll('.category-section').forEach(section => {
+    let cards = section.querySelectorAll('.product-card');
+    let temResultado = false;
+    cards.forEach(card => {
+        if(card.dataset.name.includes(t)) {
+            card.style.display = 'flex';
+            temResultado = true;
+        } else { card.style.display = 'none'; }
+    });
+    t === "" ? section.classList.remove('hidden') : (temResultado ? section.classList.remove('hidden') : section.classList.add('hidden'));
+ });
+}
+
+renderizar();
+atualizarCarrinho();
+</script>
+</body>
+</html>
